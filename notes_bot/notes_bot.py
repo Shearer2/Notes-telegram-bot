@@ -1,4 +1,5 @@
 import os
+import asyncio
 from dotenv import load_dotenv
 from aiogram import Bot, Dispatcher, executor, types
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
@@ -6,7 +7,7 @@ from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters.state import StatesGroup, State
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 
-from sqlite import db_start, create_profile, edit_profile
+from sqlite import db_start, create_profile, edit_profile, information_id, information_anime
 
 
 async def on_startup(_):
@@ -31,6 +32,7 @@ def get_kb() -> ReplyKeyboardMarkup:
     kb = [
         [
             KeyboardButton(text='/create'),
+            KeyboardButton(text='/input'),
             KeyboardButton(text='/help')
         ],
     ]
@@ -68,15 +70,27 @@ async def cmd_start(message: types.Message) -> None:
     await message.answer('Добро пожаловать! Чтобы создать профиль для хранения информации нажмите /create.',
                          reply_markup=get_kb())
     # Создаём профиль.
-    await create_profile(user_id=message.from_user.id)
+    #await create_profile(user_id=message.from_user.id)
 
 
 @dp.message_handler(commands=['create'])
 async def bot_create(message: types.Message) -> None:
-    await message.answer('Создание профиля! Для начала отправьте ваше имя.',
-                         reply_markup=get_cancel())
-    # Устанавливаем состояние имя при помощи метода set.
-    await ProfileStatesGroup.name.set()
+    inf_user = information_id()
+    if message.from_user.id not in inf_user:
+        # Создаём профиль.
+        await create_profile(user_id=message.from_user.id)
+        await message.answer('Создание профиля! Для начала отправьте ваше имя.',
+                             reply_markup=get_cancel())
+        # Устанавливаем состояние имя при помощи метода set.
+        await ProfileStatesGroup.name.set()
+    else:
+        await message.reply('Отправьте название аниме и серии, на которой вы остановились.')
+        await ProfileStatesGroup.anime_list.set()
+
+
+@dp.message_handler(commands=['input'])
+async def bot_input(message: types.Message) -> None:
+    await message.answer(information_anime(user_id=message.from_user.id))
 
 
 # Состояние name, так как мы изменили его на следующее.
