@@ -16,7 +16,9 @@ connection = psycopg2.connect(
 connection.autocommit = True
 
 
+# Функция для получения id пользователей.
 def information_id():
+    # Получаем информацию из базы данных при помощи контекстного менеджера.
     with connection.cursor() as cursor:
         cursor.execute(
             f"""SELECT user_id FROM animation.anime"""
@@ -25,6 +27,7 @@ def information_id():
     return inf_user
 
 
+# Фнукия для получения имени пользователя по заданному id.
 def information_name(user_id):
     with connection.cursor() as cursor:
         cursor.execute(
@@ -34,14 +37,19 @@ def information_name(user_id):
     return name[0]
 
 
+# Функция для вывода списка аниме у данного пользователя.
 def information_anime(user_id):
+    # Добавляем счётчик для вывода информации с нумерацией.
     count = 0
     result = 'Ваш список аниме:\n'
+    # Через контекстный менеджер получаем список аниме у данного пользователя по его id.
     with connection.cursor() as cursor:
         cursor.execute(
             f"""SELECT anime_list FROM animation.anime WHERE user_id = '{user_id}'"""
         )
+        # Список аниме представлен в базе данных в json формате, поэтому переводим его в обычный словарь.
         anime = json.loads(cursor.fetchone()[0])
+    # Вытаскиваем данные по ключу (название аниме) и значению (сезон и серия), и добавляем их в переменную.
     for key, value in anime.items():
         count += 1
         result += f'{count}) {key} {value}\n'
@@ -50,6 +58,7 @@ def information_anime(user_id):
 
 # Асинхронная функция для запуска базы данных.
 async def db_start():
+    # При помощи контекстного менеджера создаём таблицу в базе данных, если она ещё не была создана.
     with connection.cursor() as cursor:
         cursor.execute(
             "CREATE TABLE IF NOT EXISTS animation.anime(user_id bigserial PRIMARY KEY, name varchar(255), "
@@ -59,8 +68,6 @@ async def db_start():
 
 # Создаём функцию, которая будет запускаться при команде старт и создавать запись.
 async def create_profile(user_id):
-    # Если пользователь уже создан возвращаем его, иначе добавляем в базу данных.
-    # Метод fetchone берёт значение из базы данных и возвращает его.
     # Создаём пустой профиль, а при команде create начнём его заполнять.
     with connection.cursor() as cursor:
         cursor.execute(f"""
