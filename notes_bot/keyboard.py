@@ -16,6 +16,9 @@ def get_kb() -> ReplyKeyboardMarkup:
             KeyboardButton(text='/description'),
             KeyboardButton(text='/help')
         ],
+        [
+            KeyboardButton(text='/delete')
+        ],
     ]
 
     keyboard = ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True)

@@ -76,30 +76,44 @@ async def create_profile(user_id):
         """)
 
 
+# Функция для удаления информации пользователя из базы данных.
+async def delete_profile(user_id):
+    with connection.cursor() as cursor:
+        cursor.execute(f"""
+            DELETE FROM animation.anime WHERE user_id = '{user_id}'
+        """)
+
+
 # Заполняем профиль, для этого передаём состояние бота и идентификатор пользователя.
 async def edit_profile(state, user_id):
+    # Через контекстный менеджер получаем словарь аниме определённого пользователя.
     with connection.cursor() as cursor:
         cursor.execute(
             f"""SELECT anime_list FROM animation.anime WHERE user_id = '{user_id}'"""
         )
         user = cursor.fetchone()
+        # Если словарь не пустой, то переводим его из json формата в обычный словарь.
         if user[0]:
             user = json.loads(user[0])
+        # Иначе создаём пустой словарь.
         else:
             user = {}
-    print(user)
+    # Получаем имя пользователя.
     inf_name = information_name(user_id)
     # Создаём контекстный менеджер для работы с базой данных.
     async with state.proxy() as data:
+        # Заполняем словарь, в котором ключом является название аниме, а значением строка из сезона и серии.
         user[data['anime_list']] = f"{data['season']} сезон {data['series']} серия."
+        # Переводим словарь в json, второй параметр означает, что кодировку менять не нужно.
         json_data = json.dumps(user, ensure_ascii=False)
-        print(json_data)
+        # Если имя пользователя не указано, то обновляем имя пользователя и список аниме по указанному id.
         if not inf_name:
             with connection.cursor() as cursor:
                 cursor.execute(
                     f"UPDATE animation.anime SET (name, anime_list) = ('{data['name']}', '{json_data}')"
                     f"WHERE user_id = '{user_id}'"
                 )
+        # Иначе обновляем только список аниме у заданного пользователя.
         else:
             with connection.cursor() as cursor:
                 cursor.execute(

@@ -5,7 +5,7 @@ from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters.state import StatesGroup, State
 from keyboard import get_kb, get_github, get_projects, get_cancel
-from postgresql import db_start, create_profile, edit_profile, information_id, information_anime
+from postgresql import db_start, create_profile, delete_profile, edit_profile, information_id, information_anime
 
 
 async def on_startup(_):
@@ -24,6 +24,7 @@ dp = Dispatcher(bot, storage=storage)
 help_inf = """
 <b>/start</b> - <em>начать работу с ботом.</em>
 <b>/create</b> - <em>создать анкету или добавить информацию к созданной анкете.</em>
+<b>/delete</b> - <em>удалить анкету.</em>
 <b>/output</b> - <em>вывести список.</em>
 <b>/link</b> - <em>перейти в репозиторий github.</em>
 <b>/projects</b> - <em>ознакомиться с проектами.</em>
@@ -75,11 +76,28 @@ async def bot_create(message: types.Message) -> None:
         await ProfileStatesGroup.anime_list.set()
 
 
+# Обработчик команды удаления анкеты.
+@dp.message_handler(commands=['delete'])
+async def bot_delete(message: types.Message) -> None:
+    # Если id пользователя есть в базе данных, то удаляем анкету.
+    if message.from_user.id in information_id():
+        await delete_profile(user_id=message.from_user.id)
+        await message.answer('Ваша анкета была удалена!')
+    # Иначе отправляем сообщение.
+    else:
+        await message.answer('Вы не создали анкету!')
+
+
 # Обработчик команды для вывода информации.
 @dp.message_handler(commands=['output'])
 async def bot_input(message: types.Message) -> None:
-    # Отправляем в функцию id пользователя для вывода информации.
-    await message.answer(information_anime(user_id=message.from_user.id))
+    # Если id пользователя есть в базе данных, то выводим список из аниме.
+    if message.from_user.id in information_id():
+        # Отправляем в функцию id пользователя для вывода информации.
+        await message.answer(information_anime(user_id=message.from_user.id))
+    # Иначе отправляем сообщение.
+    else:
+        await message.answer('Вы не создали анкету!')
 
 
 # Обработчик команды для вывода репозиториев github.
@@ -146,7 +164,7 @@ async def state_series(message: types.Message, state: FSMContext) -> None:
         data['series'] = message.text
     # После того как весь процесс по созданию профиля завершён, будем сохранять его в базу данных.
     await edit_profile(state, user_id=message.from_user.id)
-    await message.reply('Ваша информация сохранена.')
+    await message.reply('Ваша информация сохранена.', reply_markup=get_kb())
     # Завершаем состояние.
     await state.finish()
 
