@@ -26,6 +26,15 @@ def get_kb() -> ReplyKeyboardMarkup:
     return keyboard
 
 
+def get_anime_films() -> InlineKeyboardMarkup:
+    urlkb = InlineKeyboardMarkup(row_width=1)
+    urlbtn = InlineKeyboardButton(text='Аниме', callback_data='anime')
+    urlbtn1 = InlineKeyboardButton(text='Фильм', callback_data='film')
+    urlkb.add(urlbtn, urlbtn1)
+
+    return urlkb
+
+
 # Прикреплённая к сообщению клавиатура для показа репозиториев на github.
 def get_github() -> InlineKeyboardMarkup:
     urlkb = InlineKeyboardMarkup(row_width=1)

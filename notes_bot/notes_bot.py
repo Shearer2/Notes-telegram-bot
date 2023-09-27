@@ -4,8 +4,10 @@ from aiogram import Bot, Dispatcher, executor, types
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters.state import StatesGroup, State
-from keyboard import get_kb, get_github, get_projects, get_cancel
-from postgresql import db_start, create_profile, delete_profile, edit_profile, information_id, information_anime
+from aiogram.utils.callback_data import CallbackData
+from keyboard import get_kb, get_anime_films, get_github, get_projects, get_cancel
+from postgresql import db_start, create_profile, delete_profile, edit_profile_anime, information_id, information_name, \
+    information_anime
 
 
 async def on_startup(_):
@@ -31,6 +33,7 @@ help_inf = """
 <b>/description</b> - <em>описание проекта.</em>
 <b>/help</b> - <em>вывести список команд.</em>
 """
+cb = CallbackData('get_anime_films', 'action')
 
 
 # Класс для хранения всех состояний бота.
@@ -39,6 +42,8 @@ class ProfileStatesGroup(StatesGroup):
     anime_list = State()
     season = State()
     series = State()
+    films = State()
+    calbck = State()
 
 
 # Делаем обработчик команды cancel, а чтобы указать любое возможное состояние достаточно указать *.
@@ -61,9 +66,9 @@ async def cmd_start(message: types.Message) -> None:
 @dp.message_handler(commands=['create'])
 async def bot_create(message: types.Message) -> None:
     # Записываем в переменную все доступные id уже зарегистрированных пользователей.
-    inf_user = information_id()
-    # Если id нет среди зарегистрированных, то создаём профиль.
-    if message.from_user.id not in inf_user:
+    inf_name = information_name(message.from_user.id)
+    # Если имя у данного пользователя не указано, то создаём профиль.
+    if not inf_name:
         # Создаём профиль.
         await create_profile(user_id=message.from_user.id)
         await message.answer('Создание профиля! Для начала отправьте ваше имя.',
@@ -131,13 +136,26 @@ async def state_name(message: types.Message, state: FSMContext) -> None:
     async with state.proxy() as data:
         data['name'] = message.text
 
-    await message.reply('Отправьте название аниме, которое вы хотите сохранить.')
+    await message.reply('Выберите то, что вы хотите сохранить:', reply_markup=get_anime_films())
+    await ProfileStatesGroup.calbck.set()
+    #await message.reply('Отправьте название аниме, которое вы хотите сохранить.')
     # Переходим к следующему состоянию.
-    await ProfileStatesGroup.next()
+    #await ProfileStatesGroup.next()
+
+
+@dp.callback_query_handler(state=ProfileStatesGroup.calbck)
+async def anime_film(callback: types.CallbackQuery) -> None:
+    print(callback.data)
+    if callback.data == 'anime':
+        await callback.message.edit_text('Отправьте название аниме.')
+        await ProfileStatesGroup.anime_list.set()
+    elif callback.data == 'film':
+        await callback.message.edit_text('Отправьте название фильма, который вы посмотрели.')
+        await ProfileStatesGroup.films.set()
 
 
 # Состояние для отправки пользователем названия аниме.
-@dp.message_handler(state=ProfileStatesGroup.anime_list)
+@dp.message_handler(commands=['anime'], state=ProfileStatesGroup.anime_list)
 async def state_anime(message: types.Message, state: FSMContext) -> None:
     # Добавляем в словарь название аниме.
     async with state.proxy() as data:
@@ -163,7 +181,20 @@ async def state_series(message: types.Message, state: FSMContext) -> None:
     async with state.proxy() as data:
         data['series'] = message.text
     # После того как весь процесс по созданию профиля завершён, будем сохранять его в базу данных.
-    await edit_profile(state, user_id=message.from_user.id)
+    await edit_profile_anime(state, user_id=message.from_user.id)
+    await message.reply('Ваша информация сохранена.', reply_markup=get_kb())
+    # Завершаем состояние.
+    await state.finish()
+
+
+# Состояние для сохранения фильма.
+@dp.message_handler(state=ProfileStatesGroup.films)
+async def state_films(message: types.Message, state: FSMContext) -> None:
+    # Добавляем в словарь фильм, который посмотрели.
+    async with state.proxy() as data:
+        data['films'] = message.text
+    # Сохраняем результат в базу данных.
+
     await message.reply('Ваша информация сохранена.', reply_markup=get_kb())
     # Завершаем состояние.
     await state.finish()

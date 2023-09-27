@@ -27,13 +27,15 @@ def information_id():
     return inf_user
 
 
-# Фнукия для получения имени пользователя по заданному id.
+# Функция для получения имени пользователя по заданному id.
 def information_name(user_id):
     with connection.cursor() as cursor:
         cursor.execute(
             f"""SELECT name FROM animation.anime WHERE user_id = '{user_id}'"""
         )
         name = cursor.fetchone()
+    if name is None:
+        return False
     return name[0]
 
 
@@ -68,12 +70,14 @@ async def db_start():
 
 # Создаём функцию, которая будет запускаться при команде старт и создавать запись.
 async def create_profile(user_id):
-    # Создаём пустой профиль, а при команде create начнём его заполнять.
-    with connection.cursor() as cursor:
-        cursor.execute(f"""
-            INSERT INTO animation.anime (user_id, name, anime_list)
-            VALUES ({user_id}, '', '')
-        """)
+    # Если id пользователя нет в базе данных.
+    if user_id not in information_id():
+        # Создаём пустой профиль, а при команде create начнём его заполнять.
+        with connection.cursor() as cursor:
+            cursor.execute(f"""
+                INSERT INTO animation.anime (user_id, name, anime_list)
+                VALUES ({user_id}, '', '')
+            """)
 
 
 # Функция для удаления информации пользователя из базы данных.
@@ -85,7 +89,7 @@ async def delete_profile(user_id):
 
 
 # Заполняем профиль, для этого передаём состояние бота и идентификатор пользователя.
-async def edit_profile(state, user_id):
+async def edit_profile_anime(state, user_id):
     # Через контекстный менеджер получаем словарь аниме определённого пользователя.
     with connection.cursor() as cursor:
         cursor.execute(
