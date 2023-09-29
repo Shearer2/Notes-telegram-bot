@@ -237,8 +237,8 @@ async def inline_notes(inline_query: types.InlineQuery) -> None:
         input_message_content=input_content,
         id=result_id,
         title='Заметки',
-        #description='Введите буквы',
-        #thumb_url='https://play-lh.googleusercontent.com/F3mmWSAnQ8Y3ys8KY8v0tD0Sd1hLHoSbA3SGsmQWbt5KsZq9rh2grAefGbgQKkv2Tlg'
+        description='Ваш список',
+        thumb_url='https://www.iguides.ru/upload/iblock/3a3/3a315b451eb73ac37392b3ff6802bb35.png'
     )
     # Отвечаем на инлайн запрос, передавая id сообщения, элементы, которыми будем отвечать, и время, за которое будут
     # кешироваться данные.
