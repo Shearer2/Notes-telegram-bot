@@ -51,20 +51,31 @@ def information_anime(user_id):
         cursor.execute(
             f"""SELECT anime_list FROM animation.anime WHERE user_id = '{user_id}'"""
         )
-        # Список аниме представлен в базе данных в json формате, поэтому переводим его в обычный словарь.
-        anime = json.loads(cursor.fetchone()[0])
-    # Вытаскиваем данные по ключу (название аниме) и значению (сезон и серия), и добавляем их в переменную.
-    for key, value in anime['Anime'].items():
-        count += 1
-        result += f'{count}) {key} {value}\n'
-    result += '\nВаш список фильмов:\n'
-    # Обнуляем счётчик.
-    count = 0
-    # Получаем данные по фильмам, вытаскивая ключ и значение.
-    for key, value in anime['Films'].items():
-        count += 1
-        result += f'{count}) {key} {value}\n'
-    return result
+        anime_film = cursor.fetchone()
+        # Если в базе данных присутствует словарь аниме и фильмов, то заносим его в переменную.
+        if anime_film is not None:
+            # Список аниме представлен в базе данных в json формате, поэтому переводим его в обычный словарь.
+            anime = json.loads(anime_film[0])
+        # Иначе создаём пустой словарь.
+        else:
+            anime = {}
+    # Если словарь не пустой, то выводим текст со всеми аниме и фильмами.
+    if anime:
+        # Вытаскиваем данные по ключу (название аниме) и значению (сезон и серия), и добавляем их в переменную.
+        for key, value in anime['Anime'].items():
+            count += 1
+            result += f'{count}) {key} {value}\n'
+        result += '\nВаш список фильмов:\n'
+        # Обнуляем счётчик.
+        count = 0
+        # Получаем данные по фильмам, вытаскивая ключ и значение.
+        for key, value in anime['Films'].items():
+            count += 1
+            result += f'{count}) {key} {value}\n'
+        return result
+    # Иначе возвращаем напоминание, что анкета не была создана.
+    else:
+        return 'Вы не создали анкету.'
 
 
 # Асинхронная функция для запуска базы данных.
