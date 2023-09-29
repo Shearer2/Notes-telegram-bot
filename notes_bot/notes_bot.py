@@ -1,12 +1,14 @@
 import os
+import hashlib
 from dotenv import load_dotenv
 from aiogram import Bot, Dispatcher, executor, types
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters.state import StatesGroup, State
 from aiogram.utils.callback_data import CallbackData
+from aiogram.types import InlineQueryResultArticle, InputTextMessageContent
 from keyboard import get_kb, get_anime_films, get_github, get_projects, get_cancel
-from postgresql import db_start, create_profile, delete_profile, edit_profile_anime, information_id, information_name, \
+from postgresql import db_start, create_profile, delete_profile, edit_profile, information_id, information_name, \
     information_anime
 
 
@@ -33,16 +35,21 @@ help_inf = """
 <b>/description</b> - <em>описание проекта.</em>
 <b>/help</b> - <em>вывести список команд.</em>
 """
+# Создаём колбек данные, где первым параметром указываем название функции, в которой хранится инлайн клавиатура с
+# колбеками, а вторым параметром разграничитель.
 cb = CallbackData('get_anime_films', 'action')
 
 
 # Класс для хранения всех состояний бота.
 class ProfileStatesGroup(StatesGroup):
     name = State()
+    # Расположил в таком порядке чтобы при команде смены состояния next оно переходило по очереди.
     anime_list = State()
     season = State()
     series = State()
+    # Расположил так, чтобы при команде next состояние перешло на part.
     films = State()
+    part = State()
     calbck = State()
 
 
@@ -65,7 +72,7 @@ async def cmd_start(message: types.Message) -> None:
 # Обработчик команды создания или заполнения анкеты.
 @dp.message_handler(commands=['create'])
 async def bot_create(message: types.Message) -> None:
-    # Записываем в переменную все доступные id уже зарегистрированных пользователей.
+    # Записываем в переменную имя данного пользователя по его id.
     inf_name = information_name(message.from_user.id)
     # Если имя у данного пользователя не указано, то создаём профиль.
     if not inf_name:
@@ -75,10 +82,11 @@ async def bot_create(message: types.Message) -> None:
                              reply_markup=get_cancel())
         # Устанавливаем состояние имя при помощи метода set.
         await ProfileStatesGroup.name.set()
-    # Иначе добавляем в созданный профиль новые данные.
+    # Иначе переходим к выбору аниме или фильма для сохранения информации.
     else:
-        await message.reply('Отправьте название аниме, которое вы хотите сохранить.', reply_markup=get_cancel())
-        await ProfileStatesGroup.anime_list.set()
+        await message.reply('Выберите то, что вы хотите сохранить:', reply_markup=get_anime_films())
+        # Переходим в callback запрос.
+        await ProfileStatesGroup.calbck.set()
 
 
 # Обработчик команды удаления анкеты.
@@ -96,8 +104,10 @@ async def bot_delete(message: types.Message) -> None:
 # Обработчик команды для вывода информации.
 @dp.message_handler(commands=['output'])
 async def bot_input(message: types.Message) -> None:
-    # Если id пользователя есть в базе данных, то выводим список из аниме.
-    if message.from_user.id in information_id():
+    # Записываем в переменную имя данного пользователя по его id.
+    inf_name = information_name(message.from_user.id)
+    # Если имя данного пользователя имеется в базе данных, то мы выводим информацию.
+    if inf_name:
         # Отправляем в функцию id пользователя для вывода информации.
         await message.answer(information_anime(user_id=message.from_user.id))
     # Иначе отправляем сообщение.
@@ -135,32 +145,32 @@ async def state_name(message: types.Message, state: FSMContext) -> None:
     # Используем контекстный менеджер для добавления в словарь имени пользователя.
     async with state.proxy() as data:
         data['name'] = message.text
-
+    # Выводим инлайн клавиатуру с колбеком для выбора того, что мы хотим сохранить.
     await message.reply('Выберите то, что вы хотите сохранить:', reply_markup=get_anime_films())
     await ProfileStatesGroup.calbck.set()
-    #await message.reply('Отправьте название аниме, которое вы хотите сохранить.')
-    # Переходим к следующему состоянию.
-    #await ProfileStatesGroup.next()
 
 
+# Создаём колбек функцию, чтобы узнать что нажал пользователь.
 @dp.callback_query_handler(state=ProfileStatesGroup.calbck)
 async def anime_film(callback: types.CallbackQuery) -> None:
-    print(callback.data)
+    # Если пользователь нажал Аниме, то переходим к вводу названия, сезона и серии аниме.
     if callback.data == 'anime':
-        await callback.message.edit_text('Отправьте название аниме.')
+        # Заменяю сообщение с инлайн клавиатурой на данный текст, при нажатии на кнопку с колбеком.
+        await callback.message.edit_text('Отправьте название аниме, которое вы хотите сохранить.')
         await ProfileStatesGroup.anime_list.set()
+    # Если пользователь нажал Фильм, то переходим к вводу названия и части фильма.
     elif callback.data == 'film':
         await callback.message.edit_text('Отправьте название фильма, который вы посмотрели.')
         await ProfileStatesGroup.films.set()
 
 
 # Состояние для отправки пользователем названия аниме.
-@dp.message_handler(commands=['anime'], state=ProfileStatesGroup.anime_list)
+@dp.message_handler(state=ProfileStatesGroup.anime_list)
 async def state_anime(message: types.Message, state: FSMContext) -> None:
     # Добавляем в словарь название аниме.
     async with state.proxy() as data:
         data['anime_list'] = message.text
-    await message.reply('Отправьте сезон, на котором остановились.')
+    await message.reply('Отправьте сезон, на котором остановились.', reply_markup=get_cancel())
     await ProfileStatesGroup.next()
 
 
@@ -180,8 +190,10 @@ async def state_series(message: types.Message, state: FSMContext) -> None:
     # Добавляем в словарь серию, на которой остановились.
     async with state.proxy() as data:
         data['series'] = message.text
+        # Чтобы не возникала ошибка, что ключ не найден, добавляем пустую строку в качестве значения ключа.
+        data['films'] = ''
     # После того как весь процесс по созданию профиля завершён, будем сохранять его в базу данных.
-    await edit_profile_anime(state, user_id=message.from_user.id)
+    await edit_profile(state, user_id=message.from_user.id)
     await message.reply('Ваша информация сохранена.', reply_markup=get_kb())
     # Завершаем состояние.
     await state.finish()
@@ -193,11 +205,46 @@ async def state_films(message: types.Message, state: FSMContext) -> None:
     # Добавляем в словарь фильм, который посмотрели.
     async with state.proxy() as data:
         data['films'] = message.text
-    # Сохраняем результат в базу данных.
+    await message.reply('Отправьте часть, которую посмотрели.', reply_markup=get_cancel())
+    await ProfileStatesGroup.next()
 
+
+@dp.message_handler(state=ProfileStatesGroup.part)
+async def state_part(message: types.Message, state: FSMContext) -> None:
+    # Добавляем в словарь часть фильма, которую посмотрели.
+    async with state.proxy() as data:
+        data['part'] = message.text
+        # Чтобы не возникала ошибка, что ключ не найден, задаём названию аниме пустую строку.
+        data['anime_list'] = ''
+    # Сохраняем результат в базу данных.
+    await edit_profile(state, user_id=message.from_user.id)
     await message.reply('Ваша информация сохранена.', reply_markup=get_kb())
     # Завершаем состояние.
     await state.finish()
+
+
+# Создаём инлайн запрос.
+@dp.inline_handler()
+async def inline_notes(inline_query: types.InlineQuery) -> None:
+    # Получаем текст пользователя.
+    text = inline_query.query
+    # Формируем контент ответного сообщения. Достаём список фильмов и сериалов из базы данных по id пользователя.
+    input_content = InputTextMessageContent(information_anime(user_id=inline_query['from']['id']))
+    # Для отправки сообщения у него должен быть id, который создаём данным образом.
+    result_id = hashlib.md5(text.encode()).hexdigest()
+    # Для отправки текстового сообщения используется Article.
+    item = InlineQueryResultArticle(
+        input_message_content=input_content,
+        id=result_id,
+        title='Заметки',
+        #description='Введите буквы',
+        #thumb_url='https://play-lh.googleusercontent.com/F3mmWSAnQ8Y3ys8KY8v0tD0Sd1hLHoSbA3SGsmQWbt5KsZq9rh2grAefGbgQKkv2Tlg'
+    )
+    # Отвечаем на инлайн запрос, передавая id сообщения, элементы, которыми будем отвечать, и время, за которое будут
+    # кешироваться данные.
+    await bot.answer_inline_query(inline_query_id=inline_query.id,
+                                  results=[item],
+                                  cache_time=1)
 
 
 if __name__ == '__main__':

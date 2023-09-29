@@ -26,6 +26,7 @@ def get_kb() -> ReplyKeyboardMarkup:
     return keyboard
 
 
+# Функция для создания инлайн клавиатуры с колбеком.
 def get_anime_films() -> InlineKeyboardMarkup:
     urlkb = InlineKeyboardMarkup(row_width=1)
     urlbtn = InlineKeyboardButton(text='Аниме', callback_data='anime')

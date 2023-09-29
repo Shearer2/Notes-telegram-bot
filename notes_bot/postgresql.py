@@ -34,8 +34,10 @@ def information_name(user_id):
             f"""SELECT name FROM animation.anime WHERE user_id = '{user_id}'"""
         )
         name = cursor.fetchone()
+    # Если имени нет в базе данных, то возвращаем False.
     if name is None:
         return False
+    # Иначе возвращаем имя.
     return name[0]
 
 
@@ -52,7 +54,14 @@ def information_anime(user_id):
         # Список аниме представлен в базе данных в json формате, поэтому переводим его в обычный словарь.
         anime = json.loads(cursor.fetchone()[0])
     # Вытаскиваем данные по ключу (название аниме) и значению (сезон и серия), и добавляем их в переменную.
-    for key, value in anime.items():
+    for key, value in anime['Anime'].items():
+        count += 1
+        result += f'{count}) {key} {value}\n'
+    result += '\nВаш список фильмов:\n'
+    # Обнуляем счётчик.
+    count = 0
+    # Получаем данные по фильмам, вытаскивая ключ и значение.
+    for key, value in anime['Films'].items():
         count += 1
         result += f'{count}) {key} {value}\n'
     return result
@@ -89,7 +98,7 @@ async def delete_profile(user_id):
 
 
 # Заполняем профиль, для этого передаём состояние бота и идентификатор пользователя.
-async def edit_profile_anime(state, user_id):
+async def edit_profile(state, user_id):
     # Через контекстный менеджер получаем словарь аниме определённого пользователя.
     with connection.cursor() as cursor:
         cursor.execute(
@@ -99,15 +108,19 @@ async def edit_profile_anime(state, user_id):
         # Если словарь не пустой, то переводим его из json формата в обычный словарь.
         if user[0]:
             user = json.loads(user[0])
-        # Иначе создаём пустой словарь.
+        # Иначе создаём словарь с двумя ключами.
         else:
-            user = {}
+            user = {'Anime': {}, 'Films': {}}
     # Получаем имя пользователя.
     inf_name = information_name(user_id)
     # Создаём контекстный менеджер для работы с базой данных.
     async with state.proxy() as data:
-        # Заполняем словарь, в котором ключом является название аниме, а значением строка из сезона и серии.
-        user[data['anime_list']] = f"{data['season']} сезон {data['series']} серия."
+        # Если пользователь вводил название аниме, то меняем словарь.
+        if data['anime_list']:
+            user['Anime'][data['anime_list']] = f"{data['season']} сезон {data['series']} серия."
+        # Если пользователь вводил название фильма, то меняем словарь.
+        if data['films']:
+            user['Films'][data['films']] = f"{data['part']} часть."
         # Переводим словарь в json, второй параметр означает, что кодировку менять не нужно.
         json_data = json.dumps(user, ensure_ascii=False)
         # Если имя пользователя не указано, то обновляем имя пользователя и список аниме по указанному id.
