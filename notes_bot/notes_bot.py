@@ -180,7 +180,7 @@ async def state_season(message: types.Message, state: FSMContext) -> None:
     # Добавляем в словарь сезон, на котором остановились.
     async with state.proxy() as data:
         data['season'] = message.text
-    await message.reply('Отправьте серию, на которой остановились.')
+    await message.reply('Отправьте серию, которую посмотрели.')
     await ProfileStatesGroup.next()
 
 
